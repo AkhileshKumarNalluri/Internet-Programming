@@ -1,0 +1,437 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hotel Room Booking</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f2f2f2;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: darkblue;
+        }
+        section {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+        input, select, button, textarea {
+            padding: 8px;
+            margin: 5px;
+        }
+        button {
+            background: darkblue;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid gray;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Online Hotel Room Booking</h1>
+
+<section>
+    <h2>User Registration / Login</h2>
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <p id="status"></p>
+</section>
+
+<section>
+    <h2>Search Rooms</h2>
+    <label>Destination:</label>
+    <input id="destination" placeholder="City">
+    <label>Check-in:</label>
+    <input type="date" id="checkin">
+    <label>Check-out:</label>
+    <input type="date" id="checkout">
+    <label>Guests:</label>
+    <input type="number" id="guests" value="1" min="1">
+    <button onclick="showRooms()">Check Availability</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Room Type</th>
+                <th>Price/Night</th>
+                <th>Available</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="roomList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>My Profile</h2>
+    <input id="profileName" placeholder="Full name">
+    <input id="profileEmail" type="email" placeholder="Email">
+    <button onclick="saveProfile()">Save Profile</button>
+    <p id="profileResult"></p>
+</section>
+
+<section>
+    <h2>My Booking History</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Room</th>
+                <th>Check-in</th>
+                <th>Check-out</th>
+                <th>Guests</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="bookingList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>Admin Panel</h2>
+    <p>Admin login: admin | Password: admin123</p>
+    <select id="adminRoom">
+        <option>Standard</option>
+        <option>Deluxe</option>
+        <option>Suite</option>
+        <option>Family</option>
+    </select>
+    <input id="adminPrice" type="number" placeholder="Price per night">
+    <input id="adminQuantity" type="number" placeholder="Room quantity">
+    <button onclick="updateRoom()">Update Room</button>
+    <p id="adminResult"></p>
+</section>
+
+<section>
+    <h2>About Us</h2>
+    <p>Welcome to our hotel. We provide comfortable rooms and quality service.</p>
+</section>
+
+<section>
+    <h2>Room Information</h2>
+    <p>Standard: Comfortable room for budget travelers.</p>
+    <p>Deluxe: Spacious room with premium facilities.</p>
+    <p>Suite: Luxury room with extra space.</p>
+    <p>Family: Large room suitable for families.</p>
+</section>
+
+<section>
+    <h2>Contact Us</h2>
+    <p>Email: hotel@example.com</p>
+    <p>Phone: 9876543210</p>
+    <textarea id="message" placeholder="Enter your message"></textarea>
+    <button onclick="contact()">Submit</button>
+    <p id="contactResult"></p>
+</section>
+
+<section>
+    <h2>Customer Service Q&A</h2>
+    <p><b>Q:</b> Can I cancel a booking?</p>
+    <p><b>A:</b> Yes, up to 3 days before check-in.</p>
+    <p><b>Q:</b> How can I check availability?</p>
+    <p><b>A:</b> Enter your dates and click Check Availability.</p>
+</section>
+
+<section>
+    <h2>Local Travel Guide</h2>
+    <p>Ask the hotel reception about nearby attractions and transportation.</p>
+</section>
+
+<section>
+    <h2>Privacy Policy</h2>
+    <p>Customer information should be used only for booking and hotel services.</p>
+</section>
+
+<script>
+let users = [];
+let currentUser = "";
+let rooms = [
+    {name:"Standard", price:1500, quantity:5},
+    {name:"Deluxe", price:2500, quantity:4},
+    {name:"Suite", price:4000, quantity:2},
+    {name:"Family", price:3000, quantity:3}
+];
+let bookings = [];
+let profiles = {};
+
+function register() {
+    let u = username.value.trim();
+    let p = password.value;
+
+    if (!u || !p) {
+        alert("Enter username and password");
+        return;
+    }
+    if (users.some(x => x.name === u) || u === "admin") {
+        alert("Username already exists");
+        return;
+    }
+
+    users.push({name:u, password:p});
+    alert("Registration successful");
+}
+
+function login() {
+    let u = username.value.trim();
+    let p = password.value;
+
+    if (u === "admin" && p === "admin123") {
+        currentUser = "admin";
+    } else if (users.some(x => x.name === u && x.password === p)) {
+        currentUser = u;
+    } else {
+        alert("Invalid login details");
+        return;
+    }
+
+    status.innerText = "Logged in as " + currentUser;
+    showRooms();
+    showBookings();
+    loadProfile();
+}
+
+function showRooms() {
+    roomList.innerHTML = "";
+
+    let start = checkin.value;
+    let end = checkout.value;
+
+    rooms.forEach((r, i) => {
+        let booked = bookings.filter(b =>
+            b.room === r.name &&
+            b.status === "Booked" &&
+            (!start || !end || (start < b.checkout && end > b.checkin))
+        ).length;
+
+        let available = r.quantity - booked;
+
+        roomList.innerHTML += `
+        <tr>
+            <td>${r.name}</td>
+            <td>₹${r.price}</td>
+            <td>${available}</td>
+            <td>
+                <button onclick="bookRoom(${i})">Book</button>
+            </td>
+        </tr>`;
+    });
+}
+
+function bookRoom(i) {
+    if (!currentUser || currentUser === "admin") {
+        alert("Please login as a user");
+        return;
+    }
+
+    let start = checkin.value;
+    let end = checkout.value;
+    let count = Number(guests.value);
+
+    if (!start || !end || end <= start || count < 1) {
+        alert("Enter valid dates and number of guests");
+        return;
+    }
+
+    let today = new Date().toISOString().slice(0, 10);
+    if (start < today) {
+        alert("Check-in date cannot be in the past");
+        return;
+    }
+
+    let r = rooms[i];
+    let booked = bookings.filter(b =>
+        b.room === r.name &&
+        b.status === "Booked" &&
+        start < b.checkout && end > b.checkin
+    ).length;
+
+    if (booked >= r.quantity) {
+        alert("Room not available");
+        return;
+    }
+
+    let nights = (new Date(end) - new Date(start)) / 86400000;
+
+    bookings.push({
+        user:currentUser,
+        room:r.name,
+        checkin:start,
+        checkout:end,
+        guests:count,
+        total:nights * r.price,
+        status:"Booked"
+    });
+
+    alert("Booking successful (demo only; no payment processed)");
+    showRooms();
+    showBookings();
+}
+
+function showBookings() {
+    bookingList.innerHTML = "";
+
+    bookings.forEach((b, i) => {
+        if (currentUser === "admin" || b.user === currentUser) {
+            let canChange = b.status === "Booked" &&
+                (new Date(b.checkin) - new Date()) / 86400000 >= 3;
+
+            bookingList.innerHTML += `
+            <tr>
+                <td>${b.room}</td>
+                <td>${b.checkin}</td>
+                <td>${b.checkout}</td>
+                <td>${b.guests}</td>
+                <td>₹${b.total}</td>
+                <td>${b.status}</td>
+                <td>
+                ${canChange
+                    ? `<button onclick="cancelBooking(${i})">Cancel</button>
+                       <button onclick="changeBooking(${i})">Change</button>`
+                    : "-"}
+                ${currentUser === "admin" && b.status === "Booked"
+                    ? `<button onclick="adminCancel(${i})">Admin Cancel</button>`
+                    : ""}
+                </td>
+            </tr>`;
+        }
+    });
+}
+
+function cancelBooking(i) {
+    let b = bookings[i];
+
+    if (b.user !== currentUser ||
+        b.status !== "Booked" ||
+        (new Date(b.checkin) - new Date()) / 86400000 < 3) {
+        alert("Cancellation is not allowed");
+        return;
+    }
+
+    b.status = "Cancelled";
+    showBookings();
+    showRooms();
+}
+
+function changeBooking(i) {
+    let b = bookings[i];
+
+    if (b.user !== currentUser ||
+        b.status !== "Booked" ||
+        (new Date(b.checkin) - new Date()) / 86400000 < 3) {
+        alert("Change is not allowed");
+        return;
+    }
+
+    let newStart = prompt("Enter new check-in date (YYYY-MM-DD)", b.checkin);
+    if (!newStart) return;
+
+    let newEnd = prompt("Enter new check-out date (YYYY-MM-DD)", b.checkout);
+    if (!newEnd || newEnd <= newStart ||
+        newStart < new Date().toISOString().slice(0, 10) ||
+        (new Date(b.checkin) - new Date()) / 86400000 < 3) {
+        alert("Invalid dates or change period");
+        return;
+    }
+
+    let r = rooms.find(x => x.name === b.room);
+    let occupied = bookings.filter((x, j) =>
+        j !== i && x.room === b.room && x.status === "Booked" &&
+        newStart < x.checkout && newEnd > x.checkin
+    ).length;
+
+    if (occupied >= r.quantity) {
+        alert("Room unavailable on those dates");
+        return;
+    }
+
+    b.checkin = newStart;
+    b.checkout = newEnd;
+    b.total = ((new Date(newEnd) - new Date(newStart)) / 86400000) * r.price;
+
+    showBookings();
+    showRooms();
+}
+
+function adminCancel(i) {
+    if (currentUser !== "admin") {
+        alert("Admin login required");
+        return;
+    }
+
+    bookings[i].status = "Cancelled";
+    showBookings();
+    showRooms();
+}
+
+function updateRoom() {
+    if (currentUser !== "admin") {
+        alert("Admin login required");
+        return;
+    }
+
+    let r = rooms.find(x => x.name === adminRoom.value);
+    let p = Number(adminPrice.value);
+    let q = Number(adminQuantity.value);
+
+    if (p <= 0 || q < 0 || !Number.isFinite(p) ||
+        !Number.isInteger(q)) {
+        alert("Enter a valid price and room quantity");
+        return;
+    }
+
+    r.price = p;
+    r.quantity = q;
+    adminResult.innerText = "Room details updated";
+    showRooms();
+    showBookings();
+}
+
+function saveProfile() {
+    if (!currentUser || currentUser === "admin") {
+        alert("Login as a user first");
+        return;
+    }
+
+    profiles[currentUser] = {
+        name:profileName.value,
+        email:profileEmail.value
+    };
+
+    profileResult.innerText = "Profile saved";
+}
+
+function loadProfile() {
+    let p = profiles[currentUser];
+    if (p && currentUser !== "admin") {
+        profileName.value = p.name;
+        profileEmail.value = p.email;
+    }
+}
+
+function contact() {
+    if (!message.value.trim()) {
+        alert("Enter a message");
+        return;
+    }
+
+    contactResult.innerText = "Message submitted (demo only)";
+}
+</script>
+
+</body>
+</html>
