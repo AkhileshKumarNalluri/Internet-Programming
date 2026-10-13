@@ -1,0 +1,429 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flight Reservation System</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f2f2f2;
+            margin: 20px;
+        }
+        h1, h2 { color: darkblue; }
+        section {
+            background: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        input, select, button, textarea {
+            padding: 8px;
+            margin: 5px;
+        }
+        button {
+            background: darkblue;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid gray;
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Online Flight Reservation System</h1>
+
+<section>
+    <h2>Register / Login</h2>
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <button onclick="forgotPassword()">Forgot Password</button>
+    <p id="status"></p>
+</section>
+
+<section>
+    <h2>Search Flights</h2>
+    <input id="source" placeholder="From">
+    <input id="destination" placeholder="To">
+    <input type="date" id="flightDate">
+    <select id="flightClass">
+        <option>Economy</option>
+        <option>Business</option>
+        <option>First Class</option>
+    </select>
+    <button onclick="searchFlights()">Search Flights</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Flight</th>
+                <th>Route</th>
+                <th>Class</th>
+                <th>Seats</th>
+                <th>Fare</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="flightList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>My Tickets / Booking History</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>PNR</th>
+                <th>Flight</th>
+                <th>Passenger</th>
+                <th>Date</th>
+                <th>Class</th>
+                <th>Seat</th>
+                <th>Fare</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="ticketList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>View Booking Status</h2>
+    <input id="pnrInput" placeholder="Enter PNR">
+    <button onclick="checkStatus()">Check Status</button>
+    <p id="pnrResult"></p>
+</section>
+
+<section>
+    <h2>Admin Panel</h2>
+    <p>Admin username: admin | Password: admin123</p>
+    <input id="newFlight" placeholder="Flight Name">
+    <input id="newSource" placeholder="From">
+    <input id="newDestination" placeholder="To">
+    <input id="newSeats" type="number" placeholder="Seats">
+    <input id="newFare" type="number" placeholder="Fare">
+    <button onclick="addFlight()">Add Flight</button>
+    <button onclick="adminReport()">Generate Report</button>
+    <p id="report"></p>
+</section>
+
+<section>
+    <h2>Customer Feedback</h2>
+    <textarea id="feedback" placeholder="Enter feedback"></textarea>
+    <button onclick="submitFeedback()">Submit Feedback</button>
+    <ul id="feedbackList"></ul>
+</section>
+
+<script>
+let users = [];
+let currentUser = "";
+
+let flights = [
+    {name:"Air India AI101", from:"Chennai", to:"Delhi",
+     seats:30, fare:5000},
+    {name:"IndiGo 6E202", from:"Hyderabad", to:"Mumbai",
+     seats:25, fare:4000},
+    {name:"Air India AI303", from:"Bangalore", to:"Chennai",
+     seats:20, fare:3000}
+];
+
+let tickets = [];
+
+function register() {
+    let u = username.value.trim();
+    let p = password.value;
+
+    if (!u || !p) {
+        alert("Enter username and password");
+        return;
+    }
+
+    if (u === "admin" || users.some(x => x.name === u)) {
+        alert("Username already exists");
+        return;
+    }
+
+    users.push({name:u, password:p});
+    alert("Registration successful");
+}
+
+function login() {
+    let u = username.value.trim();
+    let p = password.value;
+
+    if (u === "admin" && p === "admin123") {
+        currentUser = "admin";
+    } else if (users.some(x => x.name === u && x.password === p)) {
+        currentUser = u;
+    } else {
+        alert("Invalid login details");
+        return;
+    }
+
+    status.innerText = "Logged in as " + currentUser;
+    searchFlights();
+    showTickets();
+}
+
+function forgotPassword() {
+    let u = prompt("Enter your registered username");
+    let user = users.find(x => x.name === u);
+
+    if (user) {
+        alert("Demo only: Your password is " + user.password);
+    } else {
+        alert("Username not found");
+    }
+}
+
+function searchFlights() {
+    flightList.innerHTML = "";
+
+    flights.forEach((f, i) => {
+        if (f.from.toLowerCase().includes(source.value.trim().toLowerCase()) &&
+            f.to.toLowerCase().includes(destination.value.trim().toLowerCase())) {
+
+            let used = tickets.filter(t =>
+                t.flight === f.name &&
+                t.date === flightDate.value &&
+                t.flightClass === flightClass.value &&
+                t.status === "Booked"
+            ).length;
+
+            let available = Math.max(0, f.seats - used);
+
+            flightList.innerHTML += `
+            <tr>
+                <td>${f.name}</td>
+                <td>${f.from} - ${f.to}</td>
+                <td>${flightClass.value}</td>
+                <td>${available}</td>
+                <td>₹${f.fare}</td>
+                <td><button onclick="bookTicket(${i})">Book</button></td>
+            </tr>`;
+        }
+    });
+}
+
+function bookTicket(i) {
+    if (!currentUser || currentUser === "admin") {
+        alert("Please login as a customer");
+        return;
+    }
+
+    let date = flightDate.value;
+    let today = new Date().toISOString().slice(0, 10);
+
+    if (!date || date < today) {
+        alert("Select a valid travel date");
+        return;
+    }
+
+    let f = flights[i];
+
+    let used = tickets.filter(t =>
+        t.flight === f.name &&
+        t.date === date &&
+        t.flightClass === flightClass.value &&
+        t.status === "Booked"
+    ).length;
+
+    if (used >= f.seats) {
+        alert("No seats available");
+        return;
+    }
+
+    let passenger = prompt("Enter passenger name");
+    if (!passenger || !passenger.trim()) {
+        alert("Enter passenger name");
+        return;
+    }
+
+    let payment = confirm(
+        "Ticket fare: ₹" + f.fare +
+        "\nClick OK to simulate successful payment."
+    );
+
+    if (!payment) {
+        alert("Payment cancelled");
+        return;
+    }
+
+    let seat = used + 1;
+    let pnr = String(Date.now()).slice(-10);
+
+    tickets.push({
+        pnr:pnr,
+        user:currentUser,
+        flight:f.name,
+        passenger:passenger.trim(),
+        date:date,
+        flightClass:flightClass.value,
+        seat:seat,
+        fare:f.fare,
+        status:"Booked"
+    });
+
+    alert("Ticket booked! PNR: " + pnr);
+    searchFlights();
+    showTickets();
+}
+
+function showTickets() {
+    ticketList.innerHTML = "";
+
+    tickets.forEach((t, i) => {
+        if (currentUser === "admin" || t.user === currentUser) {
+            ticketList.innerHTML += `
+            <tr>
+                <td>${t.pnr}</td>
+                <td>${t.flight}</td>
+                <td>${t.passenger}</td>
+                <td>${t.date}</td>
+                <td>${t.flightClass}</td>
+                <td>${t.seat}</td>
+                <td>₹${t.fare}</td>
+                <td>${t.status}</td>
+                <td>
+                    ${t.status === "Booked"
+                        ? `<button onclick="cancelTicket(${i})">Cancel</button>
+                           <button onclick="printTicket(${i})">Print</button>`
+                        : "-"}
+                </td>
+            </tr>`;
+        }
+    });
+}
+
+function checkStatus() {
+    let t = tickets.find(x => x.pnr === pnrInput.value.trim());
+
+    pnrResult.innerText = t
+        ? "PNR: " + t.pnr + " | Flight: " + t.flight +
+          " | Status: " + t.status
+        : "PNR not found";
+}
+
+function cancelTicket(i) {
+    let t = tickets[i];
+
+    if (currentUser !== "admin" && t.user !== currentUser) {
+        alert("You cannot cancel another customer's ticket");
+        return;
+    }
+
+    if (t.status === "Cancelled") {
+        alert("Ticket already cancelled");
+        return;
+    }
+
+    t.status = "Cancelled";
+    alert("Ticket cancelled. Demo only; no actual refund processed.");
+    showTickets();
+    searchFlights();
+}
+
+function printTicket(i) {
+    let t = tickets[i];
+
+    if (currentUser !== "admin" && t.user !== currentUser) {
+        alert("You cannot print another customer's ticket");
+        return;
+    }
+
+    if (t.status !== "Booked") {
+        alert("Cannot print a cancelled ticket");
+        return;
+    }
+
+    let w = window.open("", "_blank");
+    w.document.write(`
+        <h1>Flight E-Ticket</h1>
+        <p>PNR: ${t.pnr}</p>
+        <p>Passenger: ${t.passenger}</p>
+        <p>Flight: ${t.flight}</p>
+        <p>Date: ${t.date}</p>
+        <p>Class: ${t.flightClass}</p>
+        <p>Seat: ${t.seat}</p>
+        <p>Fare: ₹${t.fare}</p>
+        <p>Status: ${t.status}</p>
+        <button onclick="window.print()">Print Ticket</button>
+    `);
+    w.document.close();
+}
+
+function addFlight() {
+    if (currentUser !== "admin") {
+        alert("Admin login required");
+        return;
+    }
+
+    let n = newFlight.value.trim();
+    let f = newSource.value.trim();
+    let d = newDestination.value.trim();
+    let s = Number(newSeats.value);
+    let p = Number(newFare.value);
+
+    if (!n || !f || !d || !Number.isInteger(s) ||
+        s < 1 || !Number.isFinite(p) || p <= 0) {
+        alert("Enter valid flight details");
+        return;
+    }
+
+    flights.push({
+        name:n, from:f, to:d, seats:s, fare:p
+    });
+
+    alert("Flight added successfully");
+    searchFlights();
+}
+
+function adminReport() {
+    if (currentUser !== "admin") {
+        alert("Admin login required");
+        return;
+    }
+
+    let active = tickets.filter(t => t.status === "Booked");
+    let cancelled = tickets.filter(t => t.status === "Cancelled");
+    let revenue = active.reduce((sum, t) => sum + t.fare, 0);
+
+    report.innerText =
+        "Total Flights: " + flights.length +
+        " | Booked Tickets: " + active.length +
+        " | Cancelled Tickets: " + cancelled.length +
+        " | Booking Value: ₹" + revenue;
+}
+
+function submitFeedback() {
+    if (!currentUser || currentUser === "admin") {
+        alert("Please login as a customer");
+        return;
+    }
+
+    if (!feedback.value.trim()) {
+        alert("Enter feedback");
+        return;
+    }
+
+    let li = document.createElement("li");
+    li.textContent = currentUser + ": " + feedback.value.trim();
+    feedbackList.appendChild(li);
+    feedback.value = "";
+    alert("Feedback submitted");
+}
+</script>
+
+</body>
+</html>
