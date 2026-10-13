@@ -1,0 +1,360 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Library Management System</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f2f2f2;
+            margin: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: darkblue;
+        }
+        section {
+            background: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        input, button, select {
+            padding: 8px;
+            margin: 5px;
+        }
+        button {
+            background: darkblue;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid gray;
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Library Management System</h1>
+
+<section>
+    <h2>User Registration / Login</h2>
+    <input id="username" placeholder="Enter username">
+    <input id="password" type="password" placeholder="Enter password">
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <p id="loginResult"></p>
+</section>
+
+<section>
+    <h2>Search Books</h2>
+    <input id="search" placeholder="Search book name"
+           oninput="showBooks()">
+    <table>
+        <thead>
+            <tr>
+                <th>Book Name</th>
+                <th>Author</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="bookList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>Admin - Manage Books</h2>
+    <input id="bookName" placeholder="Book name">
+    <input id="author" placeholder="Author">
+    <button onclick="addBook()">Add Book</button>
+    <button onclick="deleteBook()">Delete Last Book</button>
+    <button onclick="showBooks()">View Books</button>
+</section>
+
+<section>
+    <h2>My Borrow History</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Book</th>
+                <th>Issue Date</th>
+                <th>Expected Return</th>
+                <th>Fine</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="history"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>Study Materials</h2>
+    <select id="year">
+        <option value="1">1st Year</option>
+        <option value="2">2nd Year</option>
+        <option value="3">3rd Year</option>
+        <option value="4">4th Year</option>
+    </select>
+    <select id="semester">
+        <option value="1">Semester 1</option>
+        <option value="2">Semester 2</option>
+    </select>
+    <input id="materialName" placeholder="Material name">
+    <input id="materialFile" type="file">
+    <button onclick="addMaterial()">Upload Material</button>
+    <button onclick="showMaterials()">Search Material</button>
+    <ul id="materials"></ul>
+</section>
+
+<section>
+    <h2>My Profile</h2>
+    <p id="profile">Please log in to view your profile.</p>
+</section>
+
+<section>
+    <h2>Contact Us</h2>
+    <input id="email" type="email" placeholder="Your email">
+    <textarea id="message" placeholder="Your message"></textarea>
+    <button onclick="contact()">Submit</button>
+    <p id="contactResult"></p>
+</section>
+
+<script>
+    let users = [];
+    let currentUser = "";
+    let books = [
+        { name: "Java Programming", author: "James Gosling", issued: false },
+        { name: "Web Development", author: "Jon Duckett", issued: false },
+        { name: "Python Basics", author: "Guido van Rossum", issued: false }
+    ];
+    let history = [];
+    let materials = [];
+
+    function register() {
+        let u = username.value.trim();
+        let p = password.value;
+
+        if (!u || !p) {
+            alert("Enter username and password");
+            return;
+        }
+
+        if (users.some(user => user.name === u)) {
+            alert("Username already exists");
+            return;
+        }
+
+        users.push({ name: u, password: p });
+        alert("Registration successful. Please log in.");
+    }
+
+    function login() {
+        let u = username.value.trim();
+        let p = password.value;
+
+        if (u === "admin" && p === "admin123") {
+            currentUser = "admin";
+            loginResult.innerText = "Admin login successful";
+        } else if (users.some(user =>
+            user.name === u && user.password === p)) {
+            currentUser = u;
+            loginResult.innerText = "Welcome " + u;
+        } else {
+            alert("Invalid login details");
+            return;
+        }
+
+        profile.innerText = "Logged in as: " + currentUser;
+        showBooks();
+        showHistory();
+    }
+
+    function addBook() {
+        if (currentUser !== "admin") {
+            alert("Admin login required");
+            return;
+        }
+
+        let n = bookName.value.trim();
+        let a = author.value.trim();
+
+        if (!n || !a) {
+            alert("Enter book name and author");
+            return;
+        }
+
+        books.push({ name: n, author: a, issued: false });
+        bookName.value = "";
+        author.value = "";
+        showBooks();
+    }
+
+    function deleteBook() {
+        if (currentUser !== "admin") {
+            alert("Admin login required");
+            return;
+        }
+
+        let index = books.length - 1;
+        if (index >= 0 && !books[index].issued) {
+            books.pop();
+            showBooks();
+        } else {
+            alert("No available book to delete");
+        }
+    }
+
+    function showBooks() {
+        let s = document.getElementById("search").value.toLowerCase();
+        bookList.innerHTML = "";
+
+        books.forEach((b, i) => {
+            if (b.name.toLowerCase().includes(s)) {
+                bookList.innerHTML += `
+                    <tr>
+                    <td>${b.name}</td>
+                    <td>${b.author}</td>
+                    <td>${b.issued ? "Issued" : "Available"}</td>
+                    <td>
+                    ${b.issued
+                        ? (currentUser === "admin"
+                            ? `<button onclick="returnBook(${i})">Return</button>`
+                            : "Not available")
+                        : `<button onclick="issueBook(${i})">Issue</button>`}
+                    </td>
+                    </tr>`;
+            }
+        });
+    }
+
+    function issueBook(i) {
+        if (!currentUser || currentUser === "admin") {
+            alert("Please log in as a student");
+            return;
+        }
+
+        if (books[i].issued) {
+            alert("Book already issued");
+            return;
+        }
+
+        books[i].issued = true;
+        let today = new Date();
+        let due = new Date();
+        due.setDate(due.getDate() + 14);
+
+        history.push({
+            user: currentUser,
+            book: books[i].name,
+            issue: today.toLocaleDateString(),
+            due: due,
+            returned: false
+        });
+
+        showBooks();
+        showHistory();
+    }
+
+    function returnBook(i) {
+        if (currentUser !== "admin") {
+            alert("Admin login required");
+            return;
+        }
+
+        let record = history.find(h =>
+            h.book === books[i].name && !h.returned);
+
+        if (record) {
+            record.returned = true;
+            record.fine = Math.max(
+                0,
+                Math.ceil((new Date() - record.due) / 86400000)
+            ) * 5;
+        }
+
+        books[i].issued = false;
+        showBooks();
+        showHistory();
+    }
+
+    function showHistory() {
+        historyList = document.getElementById("history");
+        historyList.innerHTML = "";
+
+        history.filter(h =>
+            currentUser === "admin" || h.user === currentUser
+        ).forEach(h => {
+            let fine = h.returned
+                ? (h.fine || 0)
+                : Math.max(0, Math.ceil(
+                    (new Date() - h.due) / 86400000
+                )) * 5;
+
+            historyList.innerHTML += `
+                <tr>
+                <td>${h.book}</td>
+                <td>${h.issue}</td>
+                <td>${h.due.toLocaleDateString()}</td>
+                <td>₹${fine}</td>
+                <td>${h.returned ? "Returned" : "Issued"}</td>
+                </tr>`;
+        });
+    }
+
+    function addMaterial() {
+        if (currentUser !== "admin") {
+            alert("Admin login required");
+            return;
+        }
+
+        let file = materialFile.files[0];
+        if (!materialName.value.trim() || !file) {
+            alert("Enter material name and select a file");
+            return;
+        }
+
+        materials.push({
+            name: materialName.value.trim(),
+            year: year.value,
+            semester: semester.value,
+            file: URL.createObjectURL(file)
+        });
+
+        showMaterials();
+    }
+
+    function showMaterials() {
+        materialsList = document.getElementById("materials");
+        materialsList.innerHTML = "";
+
+        materials.filter(m =>
+            m.year === year.value &&
+            m.semester === semester.value
+        ).forEach(m => {
+            materialsList.innerHTML +=
+                `<li>${m.name} - <a href="${m.file}" download>
+                Download</a></li>`;
+        });
+    }
+
+    function contact() {
+        if (!email.value || !message.value.trim()) {
+            alert("Enter email and message");
+            return;
+        }
+
+        contactResult.innerText =
+            "Message entered successfully (demo only).";
+    }
+</script>
+
+</body>
+</html>
