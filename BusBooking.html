@@ -1,0 +1,360 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bus Ticket Booking System</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f2f2f2;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: darkblue;
+        }
+        section {
+            background: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        input, select, button, textarea {
+            padding: 8px;
+            margin: 5px;
+        }
+        button {
+            background: darkblue;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid gray;
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Online Bus Ticket Booking</h1>
+
+<section>
+    <h2>Registration / Login</h2>
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <p id="status"></p>
+</section>
+
+<section>
+    <h2>Search Buses</h2>
+    <input id="from" placeholder="From">
+    <input id="to" placeholder="To">
+    <input type="date" id="date">
+    <button onclick="showBuses()">Search</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Bus</th>
+                <th>Category</th>
+                <th>Route</th>
+                <th>Time</th>
+                <th>Available Seats</th>
+                <th>Fare</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="busList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>My Bookings</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Bus</th>
+                <th>Route</th>
+                <th>Date</th>
+                <th>Seat</th>
+                <th>Fare</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="bookingList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>Admin - Manage Buses</h2>
+    <p>Admin login: admin | Password: admin123</p>
+    <input id="busName" placeholder="Bus Name">
+    <input id="category" placeholder="Category (Volvo/Sleeper)">
+    <input id="source" placeholder="From">
+    <input id="destination" placeholder="To">
+    <input id="time" type="time">
+    <input id="seats" type="number" placeholder="Total Seats">
+    <input id="fare" type="number" placeholder="Fare">
+    <button onclick="addBus()">Add Bus</button>
+</section>
+
+<section>
+    <h2>Comments</h2>
+    <textarea id="comment" placeholder="Write your comment"></textarea>
+    <button onclick="addComment()">Post Comment</button>
+    <ul id="comments"></ul>
+</section>
+
+<section>
+    <h2>Admin - Reports</h2>
+    <button onclick="report()">Generate Report</button>
+    <p id="reportResult"></p>
+</section>
+
+<script>
+let users = [];
+let currentUser = "";
+let buses = [
+    {
+        name: "Express Bus",
+        category: "Volvo",
+        from: "Chennai",
+        to: "Bangalore",
+        time: "21:00",
+        seats: 10,
+        fare: 800,
+        bookedSeats: []
+    },
+    {
+        name: "Night Rider",
+        category: "Sleeper",
+        from: "Hyderabad",
+        to: "Chennai",
+        time: "20:00",
+        seats: 12,
+        fare: 1000,
+        bookedSeats: []
+    }
+];
+
+let bookings = [];
+
+function register() {
+    let u = username.value.trim();
+    let p = password.value;
+
+    if (!u || !p) {
+        alert("Enter username and password");
+        return;
+    }
+
+    if (u === "admin" || users.some(x => x.name === u)) {
+        alert("Username already exists");
+        return;
+    }
+
+    users.push({name: u, password: p});
+    alert("Registration successful");
+}
+
+function login() {
+    let u = username.value.trim();
+    let p = password.value;
+
+    if (u === "admin" && p === "admin123") {
+        currentUser = "admin";
+    } else if (users.some(x => x.name === u && x.password === p)) {
+        currentUser = u;
+    } else {
+        alert("Invalid login details");
+        return;
+    }
+
+    status.innerText = "Logged in as " + currentUser;
+    showBuses();
+    showBookings();
+}
+
+function showBuses() {
+    busList.innerHTML = "";
+
+    buses.forEach((b, i) => {
+        if (b.from.toLowerCase().includes(from.value.trim().toLowerCase()) &&
+            b.to.toLowerCase().includes(to.value.trim().toLowerCase())) {
+
+            let available = b.seats - b.bookedSeats.length;
+
+            busList.innerHTML += `
+            <tr>
+                <td>${b.name}</td>
+                <td>${b.category}</td>
+                <td>${b.from} - ${b.to}</td>
+                <td>${b.time}</td>
+                <td>${available}</td>
+                <td>₹${b.fare}</td>
+                <td><button onclick="bookTicket(${i})">Book</button></td>
+            </tr>`;
+        }
+    });
+}
+
+function bookTicket(i) {
+    if (!currentUser || currentUser === "admin") {
+        alert("Please login as a user");
+        return;
+    }
+
+    if (!date.value || date.value < new Date().toISOString().slice(0, 10)) {
+        alert("Select a valid travel date");
+        return;
+    }
+
+    let b = buses[i];
+    let seat = prompt("Enter seat number (1-" + b.seats + ")");
+
+    if (!seat || !Number.isInteger(Number(seat)) ||
+        Number(seat) < 1 || Number(seat) > b.seats) {
+        alert("Invalid seat number");
+        return;
+    }
+
+    seat = Number(seat);
+
+    if (bookings.some(x =>
+        x.bus === b.name && x.date === date.value &&
+        x.seat === seat && x.status === "Booked")) {
+        alert("Seat already booked");
+        return;
+    }
+
+    let passenger = prompt("Enter passenger name");
+    if (!passenger || !passenger.trim()) {
+        alert("Passenger name is required");
+        return;
+    }
+
+    bookings.push({
+        user: currentUser,
+        passenger: passenger.trim(),
+        bus: b.name,
+        route: b.from + " - " + b.to,
+        date: date.value,
+        seat: seat,
+        fare: b.fare,
+        status: "Booked"
+    });
+
+    alert("Ticket booked successfully (demo only; no payment processed)");
+    showBuses();
+    showBookings();
+}
+
+function showBookings() {
+    bookingList.innerHTML = "";
+
+    bookings.forEach((b, i) => {
+        if (currentUser === "admin" || b.user === currentUser) {
+            bookingList.innerHTML += `
+            <tr>
+                <td>${b.bus}</td>
+                <td>${b.route}</td>
+                <td>${b.date}</td>
+                <td>${b.seat}</td>
+                <td>₹${b.fare}</td>
+                <td>${b.status}</td>
+                <td>
+                    ${b.status === "Booked" && (b.user === currentUser || currentUser === "admin")
+                        ? `<button onclick="cancelTicket(${i})">Cancel</button>`
+                        : "-"}
+                </td>
+            </tr>`;
+        }
+    });
+}
+
+function cancelTicket(i) {
+    if (currentUser !== "admin" && bookings[i].user !== currentUser) {
+        alert("You cannot cancel another user's ticket");
+        return;
+    }
+
+    bookings[i].status = "Cancelled";
+    showBookings();
+    showBuses();
+}
+
+function addBus() {
+    if (currentUser !== "admin") {
+        alert("Admin login required");
+        return;
+    }
+
+    let n = busName.value.trim();
+    let c = category.value.trim();
+    let f = source.value.trim();
+    let t = destination.value.trim();
+    let s = Number(seats.value);
+    let price = Number(fare.value);
+
+    if (!n || !c || !f || !t || !time.value ||
+        !Number.isInteger(s) || s < 1 || !Number.isFinite(price) || price <= 0) {
+        alert("Enter valid bus details");
+        return;
+    }
+
+    buses.push({
+        name: n, category: c, from: f, to: t,
+        time: time.value, seats: s, fare: price,
+        bookedSeats: []
+    });
+
+    alert("Bus added successfully");
+    showBuses();
+}
+
+function addComment() {
+    if (!currentUser || currentUser === "admin") {
+        alert("Please login as a user");
+        return;
+    }
+
+    if (!comment.value.trim()) {
+        alert("Enter a comment");
+        return;
+    }
+
+    let li = document.createElement("li");
+    li.textContent = currentUser + ": " + comment.value.trim();
+    comments.appendChild(li);
+    comment.value = "";
+}
+
+function report() {
+    if (currentUser !== "admin") {
+        alert("Admin login required");
+        return;
+    }
+
+    let active = bookings.filter(b => b.status === "Booked").length;
+    let cancelled = bookings.filter(b => b.status === "Cancelled").length;
+    let revenue = bookings.filter(b => b.status === "Booked")
+        .reduce((sum, b) => sum + b.fare, 0);
+
+    reportResult.innerText =
+        "Total Buses: " + buses.length +
+        " | Active Bookings: " + active +
+        " | Cancelled Tickets: " + cancelled +
+        " | Booking Value: ₹" + revenue;
+}
+</script>
+
+</body>
+</html>
