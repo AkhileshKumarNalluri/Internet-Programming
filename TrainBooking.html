@@ -1,0 +1,428 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Online Train Reservation System</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f2f2f2;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: darkblue;
+        }
+        section {
+            background: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        input, select, button {
+            padding: 8px;
+            margin: 5px;
+        }
+        button {
+            background: darkblue;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid gray;
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Online Train Reservation System</h1>
+
+<section>
+    <h2>Register / Login</h2>
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <p id="status"></p>
+</section>
+
+<section>
+    <h2>Search Trains</h2>
+    <input id="from" placeholder="Origin Station">
+    <input id="to" placeholder="Destination Station">
+    <input type="date" id="journeyDate">
+
+    <select id="classType">
+        <option>Sleeper</option>
+        <option>AC 3 Tier</option>
+        <option>AC 2 Tier</option>
+        <option>First Class</option>
+    </select>
+
+    <button onclick="searchTrains()">Search Trains</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Train</th>
+                <th>Route</th>
+                <th>Class</th>
+                <th>Available Seats</th>
+                <th>Fare</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="trainList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>My Reservations</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>PNR</th>
+                <th>Passenger</th>
+                <th>Train</th>
+                <th>Date</th>
+                <th>Class</th>
+                <th>Fare</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="bookingList"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>Check PNR Status</h2>
+    <input id="pnrInput" placeholder="Enter PNR Number">
+    <button onclick="checkPNR()">Check Status</button>
+    <p id="pnrResult"></p>
+</section>
+
+<section>
+    <h2>Admin Panel</h2>
+    <p>Demo Admin Login: admin | Password: admin123</p>
+    <input id="trainName" placeholder="Train Name">
+    <input id="trainFrom" placeholder="Origin">
+    <input id="trainTo" placeholder="Destination">
+    <input id="trainSeats" type="number" placeholder="Seats">
+    <input id="trainFare" type="number" placeholder="Fare">
+    <button onclick="addTrain()">Add Train</button>
+    <button onclick="showReport()">Generate Report</button>
+    <p id="report"></p>
+</section>
+
+<script>
+let users = [];
+let currentUser = "";
+
+let trains = [
+    {
+        name: "Chennai Express",
+        from: "Chennai",
+        to: "Bangalore",
+        seats: 50,
+        fare: 500
+    },
+    {
+        name: "Superfast Express",
+        from: "Hyderabad",
+        to: "Chennai",
+        seats: 40,
+        fare: 650
+    },
+    {
+        name: "City Express",
+        from: "Bangalore",
+        to: "Hyderabad",
+        seats: 30,
+        fare: 450
+    }
+];
+
+let bookings = [];
+
+function register() {
+    let u = username.value.trim();
+    let p = password.value;
+
+    if (!u || !p) {
+        alert("Enter username and password");
+        return;
+    }
+
+    if (u === "admin" || users.some(x => x.name === u)) {
+        alert("Username already exists");
+        return;
+    }
+
+    users.push({name: u, password: p});
+    alert("Registration successful");
+}
+
+function login() {
+    let u = username.value.trim();
+    let p = password.value;
+
+    if (u === "admin" && p === "admin123") {
+        currentUser = "admin";
+    } else if (users.some(x => x.name === u && x.password === p)) {
+        currentUser = u;
+    } else {
+        alert("Invalid login details");
+        return;
+    }
+
+    status.innerText = "Logged in as " + currentUser;
+    searchTrains();
+    showBookings();
+}
+
+function searchTrains() {
+    trainList.innerHTML = "";
+
+    trains.forEach((t, i) => {
+        if (t.from.toLowerCase().includes(from.value.trim().toLowerCase()) &&
+            t.to.toLowerCase().includes(to.value.trim().toLowerCase())) {
+
+            let used = bookings.filter(b =>
+                b.train === t.name &&
+                b.date === journeyDate.value &&
+                b.classType === classType.value &&
+                b.status !== "Cancelled"
+            ).length;
+
+            let available = Math.max(0, t.seats - used);
+
+            trainList.innerHTML += `
+            <tr>
+                <td>${t.name}</td>
+                <td>${t.from} - ${t.to}</td>
+                <td>${classType.value}</td>
+                <td>${available}</td>
+                <td>₹${t.fare}</td>
+                <td><button onclick="bookTicket(${i})">Book</button></td>
+            </tr>`;
+        }
+    });
+}
+
+function bookTicket(i) {
+    if (!currentUser || currentUser === "admin") {
+        alert("Please login as a passenger");
+        return;
+    }
+
+    let date = journeyDate.value;
+    let today = new Date().toISOString().slice(0, 10);
+
+    if (!date || date < today) {
+        alert("Select a valid journey date");
+        return;
+    }
+
+    let t = trains[i];
+    let used = bookings.filter(b =>
+        b.train === t.name &&
+        b.date === date &&
+        b.classType === classType.value &&
+        b.status !== "Cancelled"
+    ).length;
+
+    if (used >= t.seats) {
+        alert("No seats available");
+        return;
+    }
+
+    let passenger = prompt("Enter passenger name");
+    if (!passenger || !passenger.trim()) {
+        alert("Passenger name required");
+        return;
+    }
+
+    let payment = confirm(
+        "Ticket fare: ₹" + t.fare +
+        "\nClick OK to simulate successful payment."
+    );
+
+    if (!payment) {
+        alert("Payment cancelled. Ticket not booked.");
+        return;
+    }
+
+    let pnr = String(Date.now()).slice(-10);
+
+    bookings.push({
+        pnr: pnr,
+        user: currentUser,
+        passenger: passenger.trim(),
+        train: t.name,
+        date: date,
+        classType: classType.value,
+        fare: t.fare,
+        status: used < t.seats ? "Confirmed" : "Waiting List",
+        refund: 0
+    });
+
+    alert("Booking successful! Your PNR is " + pnr);
+    searchTrains();
+    showBookings();
+}
+
+function showBookings() {
+    bookingList.innerHTML = "";
+
+    bookings.forEach((b, i) => {
+        if (currentUser === "admin" || b.user === currentUser) {
+            bookingList.innerHTML += `
+            <tr>
+                <td>${b.pnr}</td>
+                <td>${b.passenger}</td>
+                <td>${b.train}</td>
+                <td>${b.date}</td>
+                <td>${b.classType}</td>
+                <td>₹${b.fare}</td>
+                <td>${b.status}</td>
+                <td>
+                    ${b.status !== "Cancelled"
+                        ? `<button onclick="cancelTicket(${i})">Cancel</button>
+                           <button onclick="printTicket(${i})">Print</button>`
+                        : "Cancelled"}
+                </td>
+            </tr>`;
+        }
+    });
+}
+
+function checkPNR() {
+    let p = bookings.find(b => b.pnr === pnrInput.value.trim());
+
+    if (p) {
+        pnrResult.innerText =
+            "PNR: " + p.pnr +
+            " | Train: " + p.train +
+            " | Passenger: " + p.passenger +
+            " | Status: " + p.status;
+    } else {
+        pnrResult.innerText = "PNR not found";
+    }
+}
+
+function cancelTicket(i) {
+    let b = bookings[i];
+
+    if (currentUser !== "admin" && b.user !== currentUser) {
+        alert("You cannot cancel another passenger's ticket");
+        return;
+    }
+
+    if (b.status === "Cancelled") {
+        alert("Ticket already cancelled");
+        return;
+    }
+
+    let refundPercentage = 80;
+    b.refund = b.fare * refundPercentage / 100;
+    b.status = "Cancelled";
+
+    alert("Ticket cancelled. Demo refund amount: ₹" + b.refund);
+    searchTrains();
+    showBookings();
+}
+
+function addTrain() {
+    if (currentUser !== "admin") {
+        alert("Admin login required");
+        return;
+    }
+
+    let n = trainName.value.trim();
+    let f = trainFrom.value.trim();
+    let t = trainTo.value.trim();
+    let s = Number(trainSeats.value);
+    let price = Number(trainFare.value);
+
+    if (!n || !f || !t || !Number.isInteger(s) ||
+        s < 1 || !Number.isFinite(price) || price <= 0) {
+        alert("Enter valid train details");
+        return;
+    }
+
+    trains.push({
+        name: n,
+        from: f,
+        to: t,
+        seats: s,
+        fare: price
+    });
+
+    alert("Train added successfully");
+    searchTrains();
+}
+
+function showReport() {
+    if (currentUser !== "admin") {
+        alert("Admin login required");
+        return;
+    }
+
+    let confirmed = bookings.filter(
+        b => b.status === "Confirmed"
+    ).length;
+
+    let cancelled = bookings.filter(
+        b => b.status === "Cancelled"
+    ).length;
+
+    let revenue = bookings.filter(
+        b => b.status === "Confirmed"
+    ).reduce((sum, b) => sum + b.fare, 0);
+
+    report.innerText =
+        "Total Trains: " + trains.length +
+        " | Confirmed Tickets: " + confirmed +
+        " | Cancelled Tickets: " + cancelled +
+        " | Booking Amount: ₹" + revenue;
+}
+
+function printTicket(i) {
+    let b = bookings[i];
+
+    if (currentUser !== "admin" && b.user !== currentUser) {
+        alert("You cannot print another passenger's ticket");
+        return;
+    }
+
+    if (b.status === "Cancelled") {
+        alert("Cannot print a cancelled ticket");
+        return;
+    }
+
+    let ticket = window.open("", "_blank");
+
+    ticket.document.write(`
+        <h1>Train Reservation Ticket</h1>
+        <p>PNR: ${b.pnr}</p>
+        <p>Passenger: ${b.passenger}</p>
+        <p>Train: ${b.train}</p>
+        <p>Journey Date: ${b.date}</p>
+        <p>Class: ${b.classType}</p>
+        <p>Fare: ₹${b.fare}</p>
+        <p>Status: ${b.status}</p>
+        <button onclick="window.print()">Print Ticket</button>
+    `);
+    ticket.document.close();
+}
+</script>
+
+</body>
+</html>
